@@ -11,7 +11,8 @@ import {
   Building, 
   LogOut, 
   User as UserIcon,
-  ChevronDown
+  ChevronDown,
+  Link2
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -49,10 +50,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     if (user && !user.first_name) {
       router.push('/onboard');
-    } else if (user && businesses.length === 0 && pathname !== '/onboard') {
-      router.push('/onboard');
     }
-  }, [user, businesses, router, pathname]);
+  }, [user, router]);
 
   if (!token || !user || !activeBusiness) {
     return (
@@ -69,6 +68,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Analytics', href: '/dashboard', icon: LayoutDashboard },
     { name: 'CRM Leads', href: '/dashboard/leads', icon: Users },
     { name: 'Campaigns', href: '/dashboard/campaigns', icon: Megaphone },
+    { name: 'Integrations', href: '/dashboard/integrations', icon: Link2 },
   ];
 
   return (
