@@ -42,9 +42,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (businesses.length === 0) {
         await fetchBusinesses();
       }
+
+      const currentStore = useStore.getState();
+      if (!currentStore.user) {
+        logout();
+        router.push('/');
+      }
     };
     initData();
-  }, [token, user, businesses, router, fetchProfile, fetchBusinesses]);
+  }, [token, user, businesses, router, fetchProfile, fetchBusinesses, logout]);
 
   // Check if onboarding is needed
   useEffect(() => {
