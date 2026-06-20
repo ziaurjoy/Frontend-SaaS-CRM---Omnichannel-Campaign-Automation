@@ -4,18 +4,12 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { 
-  Link2, 
   Mail, 
   MessageSquare, 
-  QrCode, 
-  Smartphone, 
   CheckCircle, 
-  Building,
-  Key,
-  XCircle,
-  ArrowRight,
   RefreshCw,
-  Info
+  Info,
+  Loader2
 } from 'lucide-react';
 
 export default function IntegrationsPage() {
@@ -25,23 +19,20 @@ export default function IntegrationsPage() {
     connectWhatsApp, 
     connectGmail, 
     disconnectIntegration, 
+    fetchMetaConfig,
+    exchangeMetaCode,
     activeBusiness, 
     loading 
   } = useStore();
 
   const [showGmailModal, setShowGmailModal] = useState(false);
-  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
-  const [whatsappTab, setWhatsappTab] = useState<'qr' | 'otp' | 'waba'>('qr');
+
+  // Meta Embedded Signup States
+  const [isSubmittingMeta, setIsSubmittingMeta] = useState(false);
+  const [metaConfig, setMetaConfig] = useState<any>(null);
 
   // Form states - Gmail Mock
   const [gmailEmail, setGmailEmail] = useState('sales@mybusiness.com');
-
-  // Form states - WhatsApp
-  const [waPhone, setWaPhone] = useState('+1 (555) 123-4567');
-  const [waToken, setWaToken] = useState('EAAGb8vTz1...mocktoken');
-  const [waPhoneId, setWaPhoneId] = useState('109283746561');
-  const [pairingCode, setPairingCode] = useState('');
-  const [isPairingLoading, setIsPairingLoading] = useState(false);
 
   useEffect(() => {
     if (activeBusiness) {
@@ -49,10 +40,63 @@ export default function IntegrationsPage() {
     }
   }, [activeBusiness, fetchIntegrations]);
 
+  // Fetch Meta configuration on mount
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const cfg = await fetchMetaConfig();
+        setMetaConfig(cfg);
+      } catch (err) {}
+    };
+    if (activeBusiness) {
+      loadConfig();
+    }
+  }, [activeBusiness, fetchMetaConfig]);
+
+  // Load and initialize Facebook SDK & Google GIS SDK
+  useEffect(() => {
+    // 1. Load Google Identity Services (GIS) SDK
+    const loadGoogleSDK = () => {
+      if (document.getElementById('google-gsi')) return;
+      const fjs = document.getElementsByTagName('script')[0];
+      const js = document.createElement('script');
+      js.id = 'google-gsi';
+      js.src = 'https://accounts.google.com/gsi/client';
+      js.async = true;
+      js.defer = true;
+      fjs.parentNode?.insertBefore(js, fjs);
+    };
+    loadGoogleSDK();
+
+    // 2. Load Facebook SDK if App ID is configured
+    const metaAppId = process.env.NEXT_PUBLIC_META_APP_ID || metaConfig?.meta_app_id;
+    if (!metaAppId) return;
+
+    const loadFbSDK = () => {
+      if (document.getElementById('facebook-jssdk')) return;
+      const fjs = document.getElementsByTagName('script')[0];
+      const js = document.createElement('script');
+      js.id = 'facebook-jssdk';
+      js.src = 'https://connect.facebook.net/en_US/sdk.js';
+      fjs.parentNode?.insertBefore(js, fjs);
+    };
+
+    (window as any).fbAsyncInit = function() {
+      (window as any).FB.init({
+        appId            : metaAppId,
+        cookie           : true,
+        xfbml            : true,
+        version          : 'v20.0'
+      });
+    };
+
+    loadFbSDK();
+  }, [metaConfig]);
+
   const gmailIntegration = integrations.find(i => i.provider === 'Gmail' && i.status === 'Connected');
   const whatsappIntegration = integrations.find(i => i.provider === 'WhatsApp' && i.status === 'Connected');
 
-  // Handle Gmail connect simulation
+  // Handle Gmail connect simulation (Mock Mode)
   const handleGmailConnect = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -61,41 +105,144 @@ export default function IntegrationsPage() {
     } catch (err) {}
   };
 
-  // Handle WhatsApp QR Scan connect simulation
-  const handleWhatsAppQRConnect = async () => {
+  // Handle Google Login (OAuth 2.0)
+  const handleGoogleConnectClick = () => {
+    const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!googleClientId) {
+      // Fall back to standard mock connector
+      setShowGmailModal(true);
+      return;
+    }
+
+    if (!(window as any).google?.accounts?.oauth2) {
+      alert("Google Identity Services SDK is loading or failed to load. Please verify your connection.");
+      return;
+    }
+
     try {
-      await connectWhatsApp('+1 (555) 999-8888', { link_type: "QR_Code", session_id: "session_qr_992" }, 'Connected');
-      setShowWhatsAppModal(false);
-    } catch (err) {}
+      const client = (window as any).google.accounts.oauth2.initTokenClient({
+        client_id: googleClientId,
+        scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/gmail.send',
+        callback: async (response: any) => {
+          if (response.error) {
+            alert(`Google Login failed: ${response.error_description || response.error}`);
+            return;
+          }
+          if (response.access_token) {
+            try {
+              // Fetch user email dynamically from Google API using the access token
+              const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${response.access_token}` }
+              });
+              if (!userInfoRes.ok) {
+                throw new Error("Failed to fetch user email from Google.");
+              }
+              const userInfo = await userInfoRes.json();
+              const email = userInfo.email;
+              if (!email) {
+                throw new Error("No email address returned from Google.");
+              }
+
+              // Send credentials to backend
+              await connectGmail(email, {
+                access_token: response.access_token,
+                expires_in: response.expires_in,
+                scope: response.scope,
+                token_type: response.token_type
+              }, 'Connected');
+              alert(`Gmail successfully connected: ${email}`);
+            } catch (err: any) {
+              alert(`Failed to complete Gmail connection: ${err.message}`);
+            }
+          }
+        },
+      });
+      client.requestAccessToken();
+    } catch (err: any) {
+      alert(`Google client initialization failed: ${err.message}`);
+    }
   };
 
-  // Handle WhatsApp OTP Pairing Code connect simulation
-  const handleGetPairingCode = () => {
-    if (!waPhone) return;
-    setIsPairingLoading(true);
-    // Simulate generation delay
-    setTimeout(() => {
-      // Mock code: A1B2-C3D4
-      setPairingCode('A8F9-2K3P');
-      setIsPairingLoading(false);
-    }, 800);
-  };
-
-  const handleWhatsAppOTPConnect = async () => {
+  const handleMetaSignupClick = async () => {
+    setIsSubmittingMeta(true);
     try {
-      await connectWhatsApp(waPhone, { link_type: "Pairing_OTP", pairing_code: pairingCode }, 'Connected');
-      setShowWhatsAppModal(false);
-      setPairingCode('');
-    } catch (err) {}
-  };
+      const config = await fetchMetaConfig();
+      const metaAppId = process.env.NEXT_PUBLIC_META_APP_ID || config.meta_app_id;
+      const isMockMode = !metaAppId || (!process.env.NEXT_PUBLIC_META_APP_ID && config.is_mock_mode);
 
-  // Handle WhatsApp Cloud API manual connect
-  const handleWhatsAppWABAConnect = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await connectWhatsApp(waPhone, { link_type: "WABA_API", token: waToken, phone_id: waPhoneId }, 'Connected');
-      setShowWhatsAppModal(false);
-    } catch (err) {}
+      if (isMockMode) {
+        // Direct sandbox mock mode exchange
+        await exchangeMetaCode('mock_auth_code');
+        alert("WhatsApp successfully connected via Meta (Development Sandbox Mode)!");
+      } else {
+        // Trigger flow using the Meta JavaScript SDK (FB.login)
+        if (!(window as any).FB) {
+          alert("Facebook SDK is loading or failed to load. Please verify your connection.");
+          setIsSubmittingMeta(false);
+          return;
+        }
+
+        // Set up message event listener for WA_EMBEDDED_SIGNUP
+        const handleSDKMessage = async (event: MessageEvent) => {
+          if (event.origin !== 'https://www.facebook.com' && event.origin !== 'https://web.facebook.com') {
+            return;
+          }
+          try {
+            const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+            if (data?.type === 'WA_EMBEDDED_SIGNUP') {
+              console.log('WhatsApp Embedded Signup message event:', data);
+              if (data.event === 'FINISH') {
+                console.log('WhatsApp Signup Finished successfully!');
+              }
+            }
+          } catch (err) {}
+        };
+        window.addEventListener('message', handleSDKMessage);
+
+        const loginOptions: any = {
+          response_type: 'code',
+          override_default_response_type: true
+        };
+        
+        const configId = process.env.NEXT_PUBLIC_META_CONFIG_ID || config.meta_config_id;
+        if (configId) {
+          loginOptions.config_id = configId;
+        } else {
+          loginOptions.scope = 'whatsapp_business_management,whatsapp_business_messaging';
+        }
+
+        (window as any).FB.login((response: any) => {
+          window.removeEventListener('message', handleSDKMessage);
+          if (response.authResponse) {
+            const code = response.authResponse.code;
+            setIsSubmittingMeta(true);
+            
+            const metaAppSecret = process.env.NEXT_PUBLIC_META_APP_SECRET || '';
+
+            exchangeMetaCode(code, { 
+              redirect_uri: window.location.href.split('?')[0].split('#')[0],
+              meta_app_id: metaAppId,
+              meta_app_secret: metaAppSecret
+            })
+              .then(() => {
+                alert("WhatsApp successfully connected via Meta Embedded Signup!");
+              })
+              .catch((err: any) => {
+                alert(`Failed to complete Meta integration: ${err.message}`);
+              })
+              .finally(() => {
+                setIsSubmittingMeta(false);
+              });
+          } else {
+            alert("Meta login cancelled or failed.");
+            setIsSubmittingMeta(false);
+          }
+        }, loginOptions);
+      }
+    } catch (err: any) {
+      alert(`Meta Config Error: ${err.message}`);
+      setIsSubmittingMeta(false);
+    }
   };
 
   const handleDisconnect = async (id: number) => {
@@ -171,7 +318,7 @@ export default function IntegrationsPage() {
               </button>
             ) : (
               <button
-                onClick={() => setShowGmailModal(true)}
+                onClick={handleGoogleConnectClick}
                 className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
               >
                 Connect Gmail
@@ -189,8 +336,8 @@ export default function IntegrationsPage() {
                   <MessageSquare className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">WhatsApp Client Link</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Link WhatsApp phone via QR Code scan or OTP.</p>
+                  <h3 className="text-base font-bold text-white">WhatsApp Business (Meta)</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Send bulk campaign messages via WhatsApp Cloud API.</p>
                 </div>
               </div>
 
@@ -209,17 +356,42 @@ export default function IntegrationsPage() {
                   <span>Connected Phone:</span>
                   <span className="font-bold text-slate-200">{whatsappIntegration.connected_phone}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Connection Mode:</span>
-                  <span className="font-medium text-slate-400">
-                    {whatsappIntegration.credentials?.link_type === 'WABA_API' ? 'Cloud API (Meta)' : 'Multi-Device WebLink'}
-                  </span>
-                </div>
+                {whatsappIntegration.credentials?.business_name && (
+                  <div className="flex justify-between">
+                    <span>Business Name:</span>
+                    <span className="font-bold text-slate-200">{whatsappIntegration.credentials.business_name}</span>
+                  </div>
+                )}
+                {whatsappIntegration.credentials?.waba_id && (
+                  <div className="flex justify-between">
+                    <span>WABA ID:</span>
+                    <span className="font-mono text-slate-300">{whatsappIntegration.credentials.waba_id}</span>
+                  </div>
+                )}
+                {whatsappIntegration.credentials?.phone_id && (
+                  <div className="flex justify-between">
+                    <span>Phone ID:</span>
+                    <span className="font-mono text-slate-300">{whatsappIntegration.credentials.phone_id}</span>
+                  </div>
+                )}
               </div>
             ) : (
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Connect your business or personal WhatsApp number. Select "Link via QR Code" to scan on your phone (Linked Devices) or "OTP pairing" to connect instantly using phone verification.
-              </p>
+              <div className="space-y-3">
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Connect your official WhatsApp Business profile using Meta Embedded Signup. Send large-scale customer campaigns, template messages, and manage automated responses using the secure, official WhatsApp Cloud API.
+                </p>
+                <ul className="text-[11px] text-slate-500 space-y-1">
+                  <li className="flex items-center gap-1.5">
+                    <span className="text-emerald-500 font-bold">✓</span> Official Meta Business verification integration
+                  </li>
+                  <li className="flex items-center gap-1.5">
+                    <span className="text-emerald-500 font-bold">✓</span> Direct templates synchronization
+                  </li>
+                  <li className="flex items-center gap-1.5">
+                    <span className="text-emerald-500 font-bold">✓</span> High-throughput cloud message delivery
+                  </li>
+                </ul>
+              </div>
             )}
           </div>
 
@@ -233,10 +405,23 @@ export default function IntegrationsPage() {
               </button>
             ) : (
               <button
-                onClick={() => setShowWhatsAppModal(true)}
-                className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+                onClick={handleMetaSignupClick}
+                disabled={isSubmittingMeta}
+                className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:text-slate-400 text-white px-4 py-2 rounded-lg text-xs font-bold cursor-pointer transition-colors flex items-center gap-2 shadow-sm"
               >
-                Link WhatsApp
+                {isSubmittingMeta ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Connecting...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    </svg>
+                    <span>Connect with Facebook</span>
+                  </>
+                )}
               </button>
             )}
           </div>
@@ -294,226 +479,6 @@ export default function IntegrationsPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* POPUP MODAL: WhatsApp Multi-Device (QR/OTP/WABA) Setup */}
-      {showWhatsAppModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-6 text-slate-100">
-            <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-emerald-500" />
-              <span>Link WhatsApp Channel</span>
-            </h3>
-
-            {/* Modal Tabs */}
-            <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-850 mb-6">
-              <button
-                type="button"
-                onClick={() => setWhatsappTab('qr')}
-                className={`flex-1 py-1.5 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
-                  whatsappTab === 'qr' ? 'bg-slate-850 text-emerald-400' : 'text-slate-500 hover:text-slate-300'
-                }`}
-              >
-                <QrCode className="w-3.5 h-3.5" />
-                <span>QR Code Scan</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setWhatsappTab('otp')}
-                className={`flex-1 py-1.5 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
-                  whatsappTab === 'otp' ? 'bg-slate-850 text-emerald-400' : 'text-slate-500 hover:text-slate-300'
-                }`}
-              >
-                <Smartphone className="w-3.5 h-3.5" />
-                <span>OTP Pairing</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setWhatsappTab('waba')}
-                className={`flex-1 py-1.5 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
-                  whatsappTab === 'waba' ? 'bg-slate-850 text-emerald-400' : 'text-slate-500 hover:text-slate-300'
-                }`}
-              >
-                <Key className="w-3.5 h-3.5" />
-                <span>Cloud API</span>
-              </button>
-            </div>
-
-            {whatsappTab === 'qr' && (
-              /* TAB 1: QR CODE LINK */
-              <div className="flex flex-col items-center space-y-4 py-4 text-center">
-                <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
-                  Open WhatsApp on your phone, go to **Settings {"->"} Linked Devices**, and scan the generated code to link.
-                </p>
-
-                {/* Simulated QR Code box */}
-                <div className="w-48 h-48 bg-white p-3 rounded-xl border border-slate-700 flex items-center justify-center shadow-lg relative group">
-                  <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-xl">
-                    <span className="text-[10px] font-bold text-white uppercase tracking-wider">
-                      Simulated QR Code
-                    </span>
-                  </div>
-                  {/* Mock QR visual with CSS pattern */}
-                  <div className="w-full h-full bg-[radial-gradient(#10b981_3px,transparent_3px)] [background-size:12px_12px] opacity-75 border-4 border-dashed border-slate-200" />
-                </div>
-
-                <div className="flex gap-3 w-full mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setShowWhatsAppModal(false)}
-                    className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-lg text-xs font-semibold cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleWhatsAppQRConnect}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-xs font-semibold cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    <span>Simulate Scan Connection</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {whatsappTab === 'otp' && (
-              /* TAB 2: PAIRING CODE (OTP) */
-              <div className="space-y-4 py-2">
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Input your phone number to generate an 8-character pairing code. Enter this code inside your WhatsApp mobile app linked device pairing screen.
-                </p>
-
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <label htmlFor="wa_phone_otp" className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-                      WhatsApp Phone Number
-                    </label>
-                    <input
-                      id="wa_phone_otp"
-                      type="text"
-                      value={waPhone}
-                      onChange={(e) => setWaPhone(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-xs text-white focus:outline-none"
-                      placeholder="+1 (555) 0199"
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <button
-                      type="button"
-                      onClick={handleGetPairingCode}
-                      disabled={isPairingLoading}
-                      className="bg-slate-950 border border-slate-800 hover:bg-slate-800 text-slate-300 px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer h-9 disabled:opacity-40"
-                    >
-                      {isPairingLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
-                      <span>Generate Code</span>
-                    </button>
-                  </div>
-                </div>
-
-                {pairingCode && (
-                  <div className="bg-slate-950 border border-slate-850 p-6 rounded-lg text-center space-y-3">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">
-                      WhatsApp Pairing Code
-                    </span>
-                    <span className="text-3xl font-extrabold tracking-widest text-emerald-400 font-mono block select-all">
-                      {pairingCode}
-                    </span>
-                    <p className="text-[9px] text-slate-400 max-w-xs mx-auto">
-                      Open WhatsApp on your phone, navigate to **Linked Devices {"->"} Link with Phone Number**, and type the code above.
-                    </p>
-
-                    <button
-                      type="button"
-                      onClick={handleWhatsAppOTPConnect}
-                      className="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-xs font-semibold cursor-pointer"
-                    >
-                      Complete Pairing Simulation
-                    </button>
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-3 mt-6">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowWhatsAppModal(false);
-                      setPairingCode('');
-                    }}
-                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-5 py-2 rounded-lg text-xs font-semibold cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {whatsappTab === 'waba' && (
-              /* TAB 3: CLOUD API */
-              <form onSubmit={handleWhatsAppWABAConnect} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="waba_phone" className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-                      Business Phone Number
-                    </label>
-                    <input
-                      id="waba_phone"
-                      type="text"
-                      required
-                      value={waPhone}
-                      onChange={(e) => setWaPhone(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-xs text-white focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="waba_phone_id" className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-                      Phone Number ID
-                    </label>
-                    <input
-                      id="waba_phone_id"
-                      type="text"
-                      required
-                      value={waPhoneId}
-                      onChange={(e) => setWaPhoneId(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-xs text-white focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="waba_token" className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-                    System User Access Token
-                  </label>
-                  <input
-                    id="waba_token"
-                    type="text"
-                    required
-                    value={waToken}
-                    onChange={(e) => setWaToken(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-xs text-white focus:outline-none"
-                  />
-                </div>
-
-                <div className="flex gap-3 mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setShowWhatsAppModal(false)}
-                    className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-lg text-xs font-semibold cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg text-xs font-semibold cursor-pointer"
-                  >
-                    Verify & Save
-                  </button>
-                </div>
-              </form>
-            )}
-
           </div>
         </div>
       )}

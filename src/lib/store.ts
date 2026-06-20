@@ -163,6 +163,8 @@ interface AppState {
   connectWhatsApp: (phone: string, credentials?: any, status?: string) => Promise<void>;
   connectGmail: (email: string, credentials?: any, status?: string) => Promise<void>;
   disconnectIntegration: (id: number) => Promise<void>;
+  fetchMetaConfig: () => Promise<{ meta_app_id: string; meta_redirect_uri: string; meta_config_id?: string; is_mock_mode: boolean }>;
+  exchangeMetaCode: (code: string, mockData?: any) => Promise<void>;
   fetchCollections: (searchQuery?: string) => Promise<void>;
   createCollection: (collectionData: { name: string; description?: string }) => Promise<LeadCollection>;
   updateCollection: (id: number, collectionData: { name: string; description?: string }) => Promise<void>;
@@ -555,6 +557,28 @@ export const useStore = create<AppState>((set, get) => ({
       await apiFetch('/api/integrations/connect_whatsapp/', {
         method: 'POST',
         body: JSON.stringify({ phone_number: phone, credentials, status }),
+        businessId: active.id,
+      });
+      get().fetchIntegrations();
+    } catch (err: any) {
+      set({ error: err.message });
+      throw err;
+    }
+  },
+
+  fetchMetaConfig: async () => {
+    const active = get().activeBusiness;
+    if (!active) throw new Error("No active business");
+    return apiFetch('/api/integrations/meta_config/', { businessId: active.id });
+  },
+
+  exchangeMetaCode: async (code, extraParams = {}) => {
+    const active = get().activeBusiness;
+    if (!active) return;
+    try {
+      await apiFetch('/api/integrations/exchange_meta_code/', {
+        method: 'POST',
+        body: JSON.stringify({ code, ...extraParams }),
         businessId: active.id,
       });
       get().fetchIntegrations();
