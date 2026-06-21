@@ -21,6 +21,7 @@ export default function IntegrationsPage() {
     disconnectIntegration, 
     fetchMetaConfig,
     exchangeMetaCode,
+    exchangeGoogleCode,
     activeBusiness, 
     loading 
   } = useStore();
@@ -120,44 +121,28 @@ export default function IntegrationsPage() {
     }
 
     try {
-      const client = (window as any).google.accounts.oauth2.initTokenClient({
+      const client = (window as any).google.accounts.oauth2.initCodeClient({
         client_id: googleClientId,
         scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/gmail.send',
+        ux_mode: 'popup',
+        access_type: 'offline',
+        prompt: 'consent',
         callback: async (response: any) => {
           if (response.error) {
             alert(`Google Login failed: ${response.error_description || response.error}`);
             return;
           }
-          if (response.access_token) {
+          if (response.code) {
             try {
-              // Fetch user email dynamically from Google API using the access token
-              const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                headers: { Authorization: `Bearer ${response.access_token}` }
-              });
-              if (!userInfoRes.ok) {
-                throw new Error("Failed to fetch user email from Google.");
-              }
-              const userInfo = await userInfoRes.json();
-              const email = userInfo.email;
-              if (!email) {
-                throw new Error("No email address returned from Google.");
-              }
-
-              // Send credentials to backend
-              await connectGmail(email, {
-                access_token: response.access_token,
-                expires_in: response.expires_in,
-                scope: response.scope,
-                token_type: response.token_type
-              }, 'Connected');
-              alert(`Gmail successfully connected: ${email}`);
+              await exchangeGoogleCode(response.code);
+              alert("Gmail successfully connected!");
             } catch (err: any) {
               alert(`Failed to complete Gmail connection: ${err.message}`);
             }
           }
         },
       });
-      client.requestAccessToken();
+      client.requestCode();
     } catch (err: any) {
       alert(`Google client initialization failed: ${err.message}`);
     }

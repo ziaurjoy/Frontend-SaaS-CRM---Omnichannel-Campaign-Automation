@@ -58,8 +58,12 @@ interface Template {
 interface Campaign {
   id: number;
   name: string;
-  template: number;
-  template_name: string;
+  description?: string;
+  template?: number | null;
+  template_name?: string | null;
+  target_collection?: number | null;
+  target_collection_name?: string | null;
+  message_content?: string | null;
   channel: string;
   status: string;
   schedule_type: string;
@@ -156,7 +160,10 @@ interface AppState {
   createTemplate: (templateData: any) => Promise<void>;
   fetchCampaigns: () => Promise<void>;
   createCampaign: (campaignData: any) => Promise<void>;
+  updateCampaign: (campaignId: number, campaignData: any) => Promise<void>;
+  deleteCampaign: (campaignId: number) => Promise<void>;
   triggerCampaign: (campaignId: number) => Promise<void>;
+  fetchCampaignMessages: (campaignId: number) => Promise<any[]>;
   fetchMessages: () => Promise<void>;
   fetchMetrics: () => Promise<void>;
   fetchIntegrations: () => Promise<void>;
@@ -165,6 +172,7 @@ interface AppState {
   disconnectIntegration: (id: number) => Promise<void>;
   fetchMetaConfig: () => Promise<{ meta_app_id: string; meta_redirect_uri: string; meta_config_id?: string; is_mock_mode: boolean }>;
   exchangeMetaCode: (code: string, mockData?: any) => Promise<void>;
+  exchangeGoogleCode: (code: string) => Promise<void>;
   fetchCollections: (searchQuery?: string) => Promise<void>;
   createCollection: (collectionData: { name: string; description?: string }) => Promise<LeadCollection>;
   updateCollection: (id: number, collectionData: { name: string; description?: string }) => Promise<void>;
@@ -495,6 +503,41 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
+  updateCampaign: async (campaignId, campaignData) => {
+    const active = get().activeBusiness;
+    if (!active) return;
+    try {
+      await apiFetch(`/api/campaigns/${campaignId}/`, {
+        method: 'PATCH',
+        body: JSON.stringify(campaignData),
+        businessId: active.id,
+      });
+      get().fetchCampaigns();
+      get().fetchMetrics();
+    } catch (err: any) {
+      set({ error: err.message });
+      throw err;
+    }
+  },
+
+  deleteCampaign: async (campaignId) => {
+    const active = get().activeBusiness;
+    if (!active) return;
+    try {
+      await apiFetch(`/api/campaigns/${campaignId}/`, {
+        method: 'DELETE',
+        businessId: active.id,
+      });
+      set({
+        campaigns: get().campaigns.filter((c) => c.id !== campaignId),
+      });
+      get().fetchMetrics();
+    } catch (err: any) {
+      set({ error: err.message });
+      throw err;
+    }
+  },
+
   triggerCampaign: async (campaignId) => {
     const active = get().activeBusiness;
     if (!active) return;
@@ -512,6 +555,20 @@ export const useStore = create<AppState>((set, get) => ({
       throw err;
     } finally {
       set({ loading: { ...get().loading, trigger: false } });
+    }
+  },
+
+  fetchCampaignMessages: async (campaignId) => {
+    const active = get().activeBusiness;
+    if (!active) return [];
+    try {
+      const data = await apiFetch(`/api/campaigns/${campaignId}/messages/`, {
+        businessId: active.id,
+      });
+      return Array.isArray(data) ? data : data.results || [];
+    } catch (err: any) {
+      set({ error: err.message });
+      return [];
     }
   },
 
@@ -579,6 +636,22 @@ export const useStore = create<AppState>((set, get) => ({
       await apiFetch('/api/integrations/exchange_meta_code/', {
         method: 'POST',
         body: JSON.stringify({ code, ...extraParams }),
+        businessId: active.id,
+      });
+      get().fetchIntegrations();
+    } catch (err: any) {
+      set({ error: err.message });
+      throw err;
+    }
+  },
+
+  exchangeGoogleCode: async (code) => {
+    const active = get().activeBusiness;
+    if (!active) return;
+    try {
+      await apiFetch('/api/integrations/exchange_google_code/', {
+        method: 'POST',
+        body: JSON.stringify({ code }),
         businessId: active.id,
       });
       get().fetchIntegrations();
