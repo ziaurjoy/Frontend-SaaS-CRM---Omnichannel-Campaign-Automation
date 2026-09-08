@@ -44,8 +44,8 @@ export default function MetaCallbackPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-white text-center font-sans">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl space-y-6">
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 sm:p-6 text-white text-center font-sans">
+      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-8 shadow-xl space-y-6">
         {status === 'processing' && (
           <div className="space-y-4">
             <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto" />

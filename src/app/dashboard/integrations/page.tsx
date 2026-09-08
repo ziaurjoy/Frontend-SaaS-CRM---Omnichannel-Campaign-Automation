@@ -250,14 +250,14 @@ export default function IntegrationsPage() {
       </div>
 
       {/* Grid of integrations */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
         
         {/* GMAIL CARD */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md flex flex-col justify-between space-y-6">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 sm:p-6 shadow-md flex flex-col justify-between space-y-6">
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-red-500/10 rounded-lg text-red-500">
+                <div className="p-3 bg-red-500/10 rounded-lg text-red-500 shrink-0">
                   <Mail className="w-6 h-6" />
                 </div>
                 <div>
@@ -266,7 +266,7 @@ export default function IntegrationsPage() {
                 </div>
               </div>
 
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+              <span className={`self-start sm:self-auto px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                 gmailIntegration 
                   ? 'bg-emerald-600/10 border-emerald-500/25 text-emerald-400' 
                   : 'bg-slate-850 border-slate-800 text-slate-400'
@@ -277,11 +277,11 @@ export default function IntegrationsPage() {
 
             {gmailIntegration ? (
               <div className="bg-slate-950/60 p-4 border border-slate-850 rounded-lg text-xs text-slate-400 space-y-2">
-                <div className="flex justify-between">
-                  <span>Connected Email:</span>
-                  <span className="font-bold text-slate-200">{gmailIntegration.connected_email}</span>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="shrink-0">Connected Email:</span>
+                  <span className="font-bold text-slate-200 truncate">{gmailIntegration.connected_email}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center gap-2">
                   <span>Auth Type:</span>
                   <span className="font-medium text-slate-400">Google OAuth 2.0</span>
                 </div>
@@ -297,14 +297,14 @@ export default function IntegrationsPage() {
             {gmailIntegration ? (
               <button
                 onClick={() => handleDisconnect(gmailIntegration.id)}
-                className="bg-slate-950 border border-slate-800 text-red-400 hover:bg-slate-800/20 px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+                className="w-full sm:w-auto bg-slate-950 border border-slate-800 text-red-400 hover:bg-slate-800/20 px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
               >
                 Disconnect
               </button>
             ) : (
               <button
                 onClick={handleGoogleConnectClick}
-                className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
               >
                 Connect Gmail
               </button>
@@ -313,11 +313,11 @@ export default function IntegrationsPage() {
         </div>
 
         {/* WHATSAPP CARD */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md flex flex-col justify-between space-y-6">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 sm:p-6 shadow-md flex flex-col justify-between space-y-6">
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-emerald-500/10 rounded-lg text-emerald-500">
+                <div className="p-3 bg-emerald-500/10 rounded-lg text-emerald-500 shrink-0">
                   <MessageSquare className="w-6 h-6" />
                 </div>
                 <div>
@@ -326,7 +326,7 @@ export default function IntegrationsPage() {
                 </div>
               </div>
 
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+              <span className={`self-start sm:self-auto px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                 whatsappIntegration 
                   ? 'bg-emerald-600/10 border-emerald-500/25 text-emerald-400' 
                   : 'bg-slate-850 border-slate-800 text-slate-400'
@@ -337,26 +337,26 @@ export default function IntegrationsPage() {
 
             {whatsappIntegration ? (
               <div className="bg-slate-950/60 p-4 border border-slate-850 rounded-lg text-xs text-slate-400 space-y-2">
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center gap-2">
                   <span>Connected Phone:</span>
-                  <span className="font-bold text-slate-200">{whatsappIntegration.connected_phone}</span>
+                  <span className="font-bold text-slate-200 truncate">{whatsappIntegration.connected_phone}</span>
                 </div>
                 {whatsappIntegration.credentials?.business_name && (
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center gap-2">
                     <span>Business Name:</span>
-                    <span className="font-bold text-slate-200">{whatsappIntegration.credentials.business_name}</span>
+                    <span className="font-bold text-slate-200 truncate">{whatsappIntegration.credentials.business_name}</span>
                   </div>
                 )}
                 {whatsappIntegration.credentials?.waba_id && (
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center gap-2">
                     <span>WABA ID:</span>
-                    <span className="font-mono text-slate-300">{whatsappIntegration.credentials.waba_id}</span>
+                    <span className="font-mono text-slate-300 truncate max-w-[150px] sm:max-w-[200px]">{whatsappIntegration.credentials.waba_id}</span>
                   </div>
                 )}
                 {whatsappIntegration.credentials?.phone_id && (
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center gap-2">
                     <span>Phone ID:</span>
-                    <span className="font-mono text-slate-300">{whatsappIntegration.credentials.phone_id}</span>
+                    <span className="font-mono text-slate-300 truncate max-w-[150px] sm:max-w-[200px]">{whatsappIntegration.credentials.phone_id}</span>
                   </div>
                 )}
               </div>
@@ -384,7 +384,7 @@ export default function IntegrationsPage() {
             {whatsappIntegration ? (
               <button
                 onClick={() => handleDisconnect(whatsappIntegration.id)}
-                className="bg-slate-950 border border-slate-800 text-red-400 hover:bg-slate-800/20 px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+                className="w-full sm:w-auto bg-slate-950 border border-slate-800 text-red-400 hover:bg-slate-800/20 px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
               >
                 Disconnect
               </button>
@@ -392,7 +392,7 @@ export default function IntegrationsPage() {
               <button
                 onClick={handleMetaSignupClick}
                 disabled={isSubmittingMeta}
-                className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:text-slate-400 text-white px-4 py-2 rounded-lg text-xs font-bold cursor-pointer transition-colors flex items-center gap-2 shadow-sm"
+                className="w-full sm:w-auto justify-center bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:text-slate-400 text-white px-4 py-2 rounded-lg text-xs font-bold cursor-pointer transition-colors flex items-center gap-2 shadow-sm"
               >
                 {isSubmittingMeta ? (
                   <>

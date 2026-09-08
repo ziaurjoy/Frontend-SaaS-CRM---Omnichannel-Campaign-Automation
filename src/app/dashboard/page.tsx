@@ -69,23 +69,23 @@ export default function DashboardHome() {
     <div className="space-y-8">
       {/* Page Title */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-white">Dashboard Overview</h1>
-        <p className="text-sm text-slate-400 mt-1">
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">Dashboard Overview</h1>
+        <p className="text-xs sm:text-sm text-slate-400 mt-1">
           Monitor your customer outreach metrics and workspace pipeline in real-time.
         </p>
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {statCards.map((card) => {
           const Icon = card.icon;
           return (
-            <div key={card.name} className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md flex items-center justify-between">
+            <div key={card.name} className="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-6 shadow-md flex items-center justify-between">
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{card.name}</p>
-                <h3 className="text-2xl font-extrabold text-white mt-1.5">{card.value}</h3>
+                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500">{card.name}</p>
+                <h3 className="text-xl sm:text-2xl font-extrabold text-white mt-1.5">{card.value}</h3>
               </div>
-              <div className={`p-3 rounded-lg ${card.bg} ${card.color}`}>
+              <div className={`p-2.5 sm:p-3 rounded-lg ${card.bg} ${card.color} shrink-0`}>
                 <Icon className="w-5 h-5" />
               </div>
             </div>
@@ -94,16 +94,16 @@ export default function DashboardHome() {
       </div>
 
       {/* Main analytics panels */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
         
         {/* CRM Funnel Overview */}
-        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
-          <div className="flex items-center justify-between mb-6">
+        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-6 shadow-md">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 sm:gap-0 mb-6">
             <h3 className="font-bold text-white flex items-center gap-2 text-sm">
               <Flame className="w-4 h-4 text-orange-500" />
               <span>CRM Lead Pipeline Funnel</span>
             </h3>
-            <span className="text-xs text-slate-500 font-medium">Conversion distribution</span>
+            <span className="text-[11px] sm:text-xs text-slate-500 font-medium">Conversion distribution</span>
           </div>
 
           <div className="space-y-4">
@@ -137,7 +137,7 @@ export default function DashboardHome() {
         </div>
 
         {/* Messaging Logs & Delivery stats */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md flex flex-col justify-between">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-6 shadow-md flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-bold text-white flex items-center gap-2 text-sm">
@@ -183,20 +183,26 @@ export default function DashboardHome() {
       </div>
 
       {/* Bottom section: Recent activity list */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-6 shadow-md">
         <h3 className="font-bold text-white text-sm mb-4">Lead Growth Trend (Last 7 Days)</h3>
-        <div className="flex items-end justify-between gap-2 h-32 pt-4">
+        <div className="flex items-end justify-between gap-1 sm:gap-2 h-32 pt-4 overflow-x-auto">
           {metrics.lead_growth.map((day) => {
             const maxVal = Math.max(...metrics.lead_growth.map(d => d.count), 1);
             const pct = (day.count / maxVal) * 80 + 10; // offset so at least small bar renders
+            // Format YYYY-MM-DD into MM/DD or short date for mobile
+            const dateParts = day.date.split('-');
+            const shortDate = dateParts.length === 3 ? `${dateParts[1]}/${dateParts[2]}` : day.date;
+
             return (
-              <div key={day.date} className="flex-1 flex flex-col items-center gap-2">
-                <div className="text-[10px] font-bold text-slate-400">{day.count}</div>
+              <div key={day.date} className="flex-1 min-w-[32px] flex flex-col items-center gap-2">
+                <div className="text-[9px] sm:text-[10px] font-bold text-slate-400">{day.count}</div>
                 <div 
                   className="w-full bg-blue-600/30 border-t-2 border-blue-500 rounded-t transition-all duration-500"
                   style={{ height: `${pct}%` }}
                 />
-                <div className="text-[10px] text-slate-500 font-semibold">{day.date}</div>
+                <div className="text-[9px] sm:text-[10px] text-slate-500 font-semibold truncate max-w-full" title={day.date}>
+                  {shortDate}
+                </div>
               </div>
             );
           })}

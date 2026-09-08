@@ -447,7 +447,7 @@ export default function CampaignsPage() {
         </div>
 
         {/* Dashboard Metrics Section */}
-        <div className="grid grid-cols-2 lg:grid-cols-7 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 sm:gap-4">
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between shadow-sm">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Leads</span>
             <div className="mt-2 flex items-baseline gap-1.5">
@@ -992,7 +992,7 @@ export default function CampaignsPage() {
       {/* POPUP MODAL: Create Template */}
       {showTemplateModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-6 text-slate-100">
+          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 text-slate-100 max-h-[90vh] overflow-y-auto">
             <h3 className="text-base font-bold text-white mb-4">Create Message Template</h3>
             
             <form onSubmit={handleTemplateSubmit} className="space-y-4">
@@ -1090,8 +1090,8 @@ export default function CampaignsPage() {
 
       {/* POPUP MODAL: Create Campaign */}
       {showCampaignModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-6 text-slate-100 relative">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 text-slate-100 relative max-h-[90vh] overflow-y-auto">
             
             {showInlineTemplateForm ? (
               /* Inline Template Creator inside Campaign Modal */

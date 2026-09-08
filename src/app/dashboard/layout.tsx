@@ -1,7 +1,7 @@
 'use strict';
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { 
@@ -12,13 +12,16 @@ import {
   LogOut, 
   User as UserIcon,
   ChevronDown,
-  Link2
+  Link2,
+  Menu,
+  X
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [initializing, setInitializing] = React.useState(true);
+  const [initializing, setInitializing] = useState(true);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const { 
     token, 
@@ -93,6 +96,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [user, router]);
 
+  // Close mobile sidebar on route change
+  useEffect(() => {
+    setIsMobileSidebarOpen(false);
+  }, [pathname]);
+
   if (initializing || !token || !user || !activeBusiness) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-400">
@@ -112,17 +120,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   ];
 
   return (
-    <div className="min-h-screen flex bg-slate-950 text-slate-100">
+    <div className="min-h-screen flex bg-slate-950 text-slate-100 relative overflow-x-hidden">
       
+      {/* Mobile Backdrop Overlay */}
+      {isMobileSidebarOpen && (
+        <div 
+          onClick={() => setIsMobileSidebarOpen(false)}
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40 lg:hidden"
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 border-r border-slate-800 bg-slate-900/60 backdrop-blur flex flex-col justify-between">
+      <aside 
+        className={`fixed inset-y-0 left-0 z-50 w-64 border-r border-slate-800 bg-slate-900/95 lg:bg-slate-900/60 backdrop-blur flex flex-col justify-between transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
+          isMobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
+        }`}
+      >
         <div>
-          {/* Logo / Brand */}
-          <div className="p-6 border-b border-slate-800">
-            <h2 className="text-xl font-bold tracking-tight bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">
-              OmniCampaign
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">SaaS Workspace</p>
+          {/* Logo / Brand Header */}
+          <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold tracking-tight bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">
+                OmniCampaign
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">SaaS Workspace</p>
+            </div>
+            <button
+              onClick={() => setIsMobileSidebarOpen(false)}
+              className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           {/* Tenant Switcher */}
@@ -157,7 +185,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               return (
                 <button
                   key={item.name}
-                  onClick={() => router.push(item.href)}
+                  onClick={() => {
+                    router.push(item.href);
+                    setIsMobileSidebarOpen(false);
+                  }}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
                     isActive 
                       ? 'bg-blue-600/10 text-blue-400 border-l-2 border-blue-500' 
@@ -175,7 +206,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* User Account / Sign Out Footer */}
         <div className="p-4 border-t border-slate-800 bg-slate-950/20">
           <div className="flex items-center gap-3 mb-4 px-1">
-            <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/20 flex items-center justify-center text-blue-400">
+            <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
               <UserIcon className="w-4 h-4" />
             </div>
             <div className="overflow-hidden">
@@ -200,23 +231,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-h-screen overflow-y-auto">
-        <header className="h-16 border-b border-slate-800 bg-slate-900/20 flex items-center justify-between px-8">
-          <div className="flex items-center gap-2">
-            <Building className="w-5 h-5 text-blue-500" />
-            <h3 className="font-semibold text-white text-sm">
-              {activeBusiness.name}
-            </h3>
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-y-auto">
+        <header className="h-16 border-b border-slate-800 bg-slate-900/20 flex items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="lg:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer"
+              aria-label="Open menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-2 overflow-hidden">
+              <Building className="w-5 h-5 text-blue-500 shrink-0" />
+              <h3 className="font-semibold text-white text-sm truncate max-w-[160px] sm:max-w-xs">
+                {activeBusiness.name}
+              </h3>
+            </div>
           </div>
+
           <div className="text-xs text-slate-500 font-medium">
-            Timezone: <span className="text-slate-300 font-semibold">{activeBusiness.timezone || 'UTC'}</span>
+            <span className="hidden sm:inline">Timezone: </span>
+            <span className="text-slate-300 font-semibold">{activeBusiness.timezone || 'UTC'}</span>
           </div>
         </header>
         
-        <main className="flex-1 p-8">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8">
           {children}
         </main>
       </div>
     </div>
   );
 }
+

@@ -90,10 +90,10 @@ export default function OnboardingPage() {
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl text-slate-100">
+      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-8 shadow-xl text-slate-100">
         
         {/* Header and Step Indicator */}
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <div className="flex items-center justify-between mb-4">
             <span className="text-xs font-bold uppercase tracking-widest text-blue-500">
               Setup Workspace
@@ -102,10 +102,10 @@ export default function OnboardingPage() {
               Step {step} of 2
             </span>
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
             {step === 1 ? 'Tell us about yourself' : 'Configure your business'}
           </h1>
-          <p className="mt-1.5 text-sm text-slate-400">
+          <p className="mt-1.5 text-xs sm:text-sm text-slate-400">
             {step === 1 
               ? 'Complete your profile details to personalize your workspace.' 
               : 'Add business information to initialize your CRM pipeline.'}
@@ -129,7 +129,7 @@ export default function OnboardingPage() {
         {step === 1 ? (
           /* STEP 1: User Profile Form */
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="first_name" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
                   First Name <span className="text-red-500">*</span>
@@ -226,7 +226,7 @@ export default function OnboardingPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="industry" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
                   Industry

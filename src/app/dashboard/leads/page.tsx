@@ -516,11 +516,11 @@ export default function LeadsPage() {
             </div>
           ) : viewMode === 'board' ? (
             /* KANBAN BOARD VIEW */
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 overflow-x-auto pb-4">
+            <div className="flex gap-4 overflow-x-auto pb-4 snap-x">
               {stages.map((stg) => {
                 const stgLeads = leads.filter(l => l.stage === stg);
                 return (
-                  <div key={stg} className="bg-slate-900 border border-slate-800/80 rounded-xl p-4 flex flex-col min-w-[240px]">
+                  <div key={stg} className="bg-slate-900 border border-slate-800/80 rounded-xl p-4 flex flex-col w-72 shrink-0 snap-center">
                     <div className="flex items-center justify-between border-b border-slate-800/60 pb-3 mb-4">
                       <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
                         {stg}
@@ -805,7 +805,7 @@ export default function LeadsPage() {
       {/* POPUP MODAL: Add Lead */}
       {showAddLeadModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 text-slate-100">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 text-slate-100 max-h-[90vh] overflow-y-auto">
             <h3 className="text-base font-bold text-white mb-4">Add Custom Lead</h3>
             
             <form onSubmit={handleAddLead} className="space-y-4">
@@ -824,7 +824,7 @@ export default function LeadsPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="lead_email" className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
                     Email Address
@@ -853,7 +853,7 @@ export default function LeadsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="lead_website" className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
                     Website URL
@@ -898,7 +898,7 @@ export default function LeadsPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="lead_source" className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
                     Source
@@ -951,7 +951,7 @@ export default function LeadsPage() {
       {/* POPUP MODAL: Edit Lead */}
       {showEditLeadModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 text-slate-100">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 text-slate-100 max-h-[90vh] overflow-y-auto">
             <h3 className="text-base font-bold text-white mb-4">Edit Lead Info</h3>
             
             <form onSubmit={handleEditLeadSubmit} className="space-y-4">
@@ -969,7 +969,7 @@ export default function LeadsPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="edit_lead_email" className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
                     Email Address
@@ -996,7 +996,7 @@ export default function LeadsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="edit_lead_website" className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
                     Website URL
@@ -1039,7 +1039,7 @@ export default function LeadsPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="edit_lead_source" className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
                     Source

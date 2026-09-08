@@ -109,9 +109,19 @@ export default function AuthPage() {
         </div>
 
         {/* Right Side: Auth Form */}
-        <div className="p-8 md:p-12 flex flex-col justify-center bg-slate-950/80 text-slate-100">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold tracking-tight text-white">
+        <div className="p-6 sm:p-8 md:p-12 flex flex-col justify-center bg-slate-950/80 text-slate-100">
+          {/* Mobile Brand Banner */}
+          <div className="block md:hidden mb-6 pb-6 border-b border-slate-800">
+            <h1 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 to-indigo-200 bg-clip-text text-transparent">
+              OmniCampaign
+            </h1>
+            <p className="mt-1 text-indigo-200/80 text-xs">
+              SaaS CRM & Omnichannel Campaign Automation
+            </p>
+          </div>
+
+          <div className="mb-6 sm:mb-8">
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
               {isLogin ? 'Sign in to workspace' : 'Create an account'}
             </h2>
             <p className="mt-2 text-sm text-slate-400">
@@ -157,7 +167,7 @@ export default function AuthPage() {
 
             {!isLogin && (
               <>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="first_name" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
                       First Name
