@@ -18,6 +18,8 @@ import {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const [initializing, setInitializing] = React.useState(true);
+
   const { 
     token, 
     user, 
@@ -30,27 +32,59 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   } = useStore();
 
   useEffect(() => {
-    if (!token) {
-      router.push('/');
-      return;
-    }
+    let isMounted = true;
 
     const initData = async () => {
-      if (!user) {
-        await fetchProfile();
-      }
-      if (businesses.length === 0) {
-        await fetchBusinesses();
+      const storedToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      if (!storedToken && !token) {
+        if (isMounted) setInitializing(false);
+        router.push('/');
+        return;
       }
 
-      const currentStore = useStore.getState();
-      if (!currentStore.user) {
+      try {
+        let currentUser = user;
+        if (!currentUser) {
+          await fetchProfile();
+          currentUser = useStore.getState().user;
+        }
+
+        if (!currentUser || !useStore.getState().token) {
+          logout();
+          if (isMounted) setInitializing(false);
+          router.push('/');
+          return;
+        }
+
+        let currentBusinesses = useStore.getState().businesses;
+        if (currentBusinesses.length === 0) {
+          await fetchBusinesses();
+          currentBusinesses = useStore.getState().businesses;
+        }
+
+        if (currentBusinesses.length === 0) {
+          if (isMounted) setInitializing(false);
+          router.push('/onboard');
+          return;
+        }
+      } catch (err) {
         logout();
+        if (isMounted) setInitializing(false);
         router.push('/');
+        return;
+      }
+
+      if (isMounted) {
+        setInitializing(false);
       }
     };
+
     initData();
-  }, [token, user, businesses, router, fetchProfile, fetchBusinesses, logout]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [token, fetchProfile, fetchBusinesses, logout, router]);
 
   // Check if onboarding is needed
   useEffect(() => {
@@ -59,7 +93,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [user, router]);
 
-  if (!token || !user || !activeBusiness) {
+  if (initializing || !token || !user || !activeBusiness) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-400">
         <div className="flex flex-col items-center gap-3">

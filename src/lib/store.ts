@@ -307,7 +307,10 @@ export const useStore = create<AppState>((set, get) => ({
       const user = await apiFetch('/api/auth/profile/');
       set({ user });
     } catch (err: any) {
-      set({ error: err.message });
+      set({ error: err.message, token: null, user: null });
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_token');
+      }
     }
   },
 
@@ -317,9 +320,11 @@ export const useStore = create<AppState>((set, get) => ({
       const businesses = Array.isArray(data) ? data : data.results || [];
       set({ businesses });
       if (businesses.length > 0 && !get().activeBusiness) {
-        const savedId = localStorage.getItem('active_business_id');
+        const savedId = typeof window !== 'undefined' ? localStorage.getItem('active_business_id') : null;
         const savedBusiness = businesses.find((b: Business) => b.id === savedId) || businesses[0];
         get().setActiveBusiness(savedBusiness);
+      } else if (businesses.length === 0) {
+        set({ activeBusiness: null });
       }
     } catch (err: any) {
       set({ error: err.message });
