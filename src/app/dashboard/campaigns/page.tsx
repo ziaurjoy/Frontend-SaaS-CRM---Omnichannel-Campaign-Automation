@@ -3,13 +3,13 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
-import { 
-  Plus, 
-  Megaphone, 
-  FileText, 
-  Play, 
-  Layers, 
-  Variable, 
+import {
+  Plus,
+  Megaphone,
+  FileText,
+  Play,
+  Layers,
+  Variable,
   CheckCircle,
   HelpCircle,
   ArrowLeft,
@@ -28,25 +28,33 @@ import {
   XCircle,
   RefreshCw,
   Sparkles,
-  Trash2
+  Trash2,
+  Wand2,
+  Bot,
+  Cpu,
+  Copy,
+  Mail,
+  X
 } from 'lucide-react';
 
 export default function CampaignsPage() {
-  const { 
-    templates, 
-    campaigns, 
+  const {
+    templates,
+    campaigns,
     collections,
-    fetchTemplates, 
-    fetchCampaigns, 
+    fetchTemplates,
+    fetchCampaigns,
     fetchCollections,
-    createTemplate, 
-    createCampaign, 
+    createTemplate,
+    generateAITemplates,
+    deleteTemplate,
+    createCampaign,
     updateCampaign,
     deleteCampaign,
-    triggerCampaign, 
+    triggerCampaign,
     fetchCampaignMessages,
-    activeBusiness, 
-    loading 
+    activeBusiness,
+    loading
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<'campaigns' | 'templates'>('campaigns');
@@ -60,6 +68,96 @@ export default function CampaignsPage() {
   const [tType, setTType] = useState('Email');
   const [tSubject, setTSubject] = useState('');
   const [tBody, setTBody] = useState('');
+
+  // AI Template Generator States
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiChannel, setAiChannel] = useState<'Email' | 'WhatsApp'>('Email');
+  const [aiProvider, setAiProvider] = useState<'openai' | 'gemini'>('openai');
+  const [aiTone, setAiTone] = useState<string>('Professional');
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [aiOptions, setAiOptions] = useState<Array<{ name: string; subject?: string; body: string }>>([]);
+  const [selectedAiIndex, setSelectedAiIndex] = useState(0);
+  const [copiedTemplateId, setCopiedTemplateId] = useState<number | null>(null);
+
+  // Active editing state for generated AI option
+  const [editingTName, setEditingTName] = useState('');
+  const [editingTSubject, setEditingTSubject] = useState('');
+  const [editingTBody, setEditingTBody] = useState('');
+
+  const handleGenerateAIOptions = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!aiPrompt.trim()) return;
+    setIsGeneratingAi(true);
+    try {
+      const res = await generateAITemplates({
+        prompt: aiPrompt,
+        type: aiChannel,
+        provider: aiProvider,
+        tone: aiTone
+      });
+      if (res && res.options && res.options.length > 0) {
+        setAiOptions(res.options);
+        setSelectedAiIndex(0);
+        setEditingTName(res.options[0].name || `AI ${aiChannel} Template`);
+        setEditingTSubject(res.options[0].subject || '');
+        setEditingTBody(res.options[0].body || '');
+      }
+    } catch (err: any) {
+      alert(`AI Generation error: ${err.message}`);
+    } finally {
+      setIsGeneratingAi(false);
+    }
+  };
+
+  const handleSelectAiOption = (index: number) => {
+    setSelectedAiIndex(index);
+    const opt = aiOptions[index];
+    if (opt) {
+      setEditingTName(opt.name || `AI ${aiChannel} Option ${index + 1}`);
+      setEditingTSubject(opt.subject || '');
+      setEditingTBody(opt.body || '');
+    }
+  };
+
+  const handleSaveAiTemplate = async () => {
+    if (!editingTName.trim() || !editingTBody.trim()) {
+      alert("Please enter a valid template name and body.");
+      return;
+    }
+    try {
+      await createTemplate({
+        name: editingTName,
+        type: aiChannel,
+        subject: aiChannel === 'Email' ? editingTSubject : '',
+        body: editingTBody
+      });
+      setShowAiModal(false);
+      setAiOptions([]);
+      setAiPrompt('');
+      alert("AI Template saved successfully!");
+    } catch (err: any) {
+      alert(`Failed to save template: ${err.message}`);
+    }
+  };
+
+  const handleDeleteTemplateClick = async (id: number) => {
+    if (window.confirm("Are you sure you want to delete this template?")) {
+      try {
+        await deleteTemplate(id);
+      } catch (err) {}
+    }
+  };
+
+  const handleCopyTemplateBody = (id: number, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedTemplateId(id);
+    setTimeout(() => setCopiedTemplateId(null), 2000);
+  };
+
+  const insertVariableTag = (tagName: string) => {
+    setEditingTBody((prev) => `${prev} {{${tagName}}}`);
+  };
 
   // Form states - Campaign
   const [cName, setCName] = useState('');
@@ -145,7 +243,7 @@ export default function CampaignsPage() {
         body: inlineTBody,
       });
       await fetchTemplates();
-      
+
       // Auto-select newly created template
       const currentTemplates = useStore.getState().templates;
       const createdTpl = currentTemplates.find(t => t.name === inlineTName);
@@ -154,7 +252,7 @@ export default function CampaignsPage() {
         setCChannel(createdTpl.type);
         setCMessageContent(createdTpl.body);
       }
-      
+
       setInlineTName('');
       setInlineTSubject('');
       setInlineTBody('');
@@ -352,7 +450,7 @@ export default function CampaignsPage() {
       selectedCampaign?.name || 'N/A'
     ]);
 
-    const csvContent = "data:text/csv;charset=utf-8," 
+    const csvContent = "data:text/csv;charset=utf-8,"
       + [headers.join(","), ...rows.map(e => e.map(val => `"${val.replace(/"/g, '""')}"`).join(","))].join("\n");
 
     const encodedUri = encodeURI(csvContent);
@@ -368,7 +466,7 @@ export default function CampaignsPage() {
   if (selectedCampaignId && selectedCampaign) {
     return (
       <div className="space-y-6">
-        
+
         {/* Back header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-5">
           <div className="space-y-2">
@@ -382,8 +480,8 @@ export default function CampaignsPage() {
             <div className="flex items-center gap-3">
               <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">{selectedCampaign.name}</h1>
               <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wide border ${
-                selectedCampaign.status === 'Active' 
-                  ? 'bg-blue-600/10 border-blue-500/25 text-blue-400' 
+                selectedCampaign.status === 'Active'
+                  ? 'bg-blue-600/10 border-blue-500/25 text-blue-400'
                   : selectedCampaign.status === 'Completed'
                   ? 'bg-emerald-600/10 border-emerald-500/25 text-emerald-400'
                   : selectedCampaign.status === 'Paused'
@@ -423,7 +521,7 @@ export default function CampaignsPage() {
               <Trash2 className="w-4 h-4" />
               <span>Delete Campaign</span>
             </button>
-            
+
             {selectedCampaign.status !== 'Completed' && (
               <button
                 onClick={() => handleTriggerCampaignFromDetails(selectedCampaign.id)}
@@ -503,7 +601,7 @@ export default function CampaignsPage() {
 
         {/* Lead Table Container */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-md">
-          
+
           {/* Filtering Header */}
           <div className="p-4 md:p-6 border-b border-slate-800 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-slate-950/20">
             <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
@@ -525,8 +623,8 @@ export default function CampaignsPage() {
                     key={status}
                     onClick={() => setStatusFilter(status)}
                     className={`px-3 py-1 rounded text-[10px] font-bold transition-all cursor-pointer whitespace-nowrap ${
-                      statusFilter === status 
-                        ? 'bg-slate-800 text-white' 
+                      statusFilter === status
+                        ? 'bg-slate-800 text-white'
                         : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
@@ -671,7 +769,7 @@ export default function CampaignsPage() {
   // Otherwise, list view
   return (
     <div className="space-y-6">
-      
+
       {/* Header Panel */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -709,13 +807,27 @@ export default function CampaignsPage() {
           )}
 
           {activeTab === 'templates' ? (
-            <button
-              onClick={() => setShowTemplateModal(true)}
-              className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 cursor-pointer transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Create Template</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setShowAiModal(true);
+                  setAiOptions([]);
+                  setAiPrompt('');
+                }}
+                className="bg-gradient-to-r from-indigo-600 via-purple-600 to-emerald-600 hover:from-indigo-500 hover:to-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-950/40 cursor-pointer transition-all hover:scale-[1.02]"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+                <span>AI Template Generator ✨</span>
+              </button>
+
+              <button
+                onClick={() => setShowTemplateModal(true)}
+                className="bg-slate-900 border border-slate-700 hover:border-slate-600 text-slate-200 hover:text-white px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Manual Create</span>
+              </button>
+            </div>
           ) : (
             <button
               onClick={() => {
@@ -745,8 +857,8 @@ export default function CampaignsPage() {
         <button
           onClick={() => setActiveTab('campaigns')}
           className={`px-5 py-3 text-sm font-semibold border-b-2 transition-all cursor-pointer ${
-            activeTab === 'campaigns' 
-              ? 'border-blue-500 text-blue-400 font-bold' 
+            activeTab === 'campaigns'
+              ? 'border-blue-500 text-blue-400 font-bold'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
@@ -755,8 +867,8 @@ export default function CampaignsPage() {
         <button
           onClick={() => setActiveTab('templates')}
           className={`px-5 py-3 text-sm font-semibold border-b-2 transition-all cursor-pointer ${
-            activeTab === 'templates' 
-              ? 'border-blue-500 text-blue-400 font-bold' 
+            activeTab === 'templates'
+              ? 'border-blue-500 text-blue-400 font-bold'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
@@ -770,8 +882,8 @@ export default function CampaignsPage() {
           /* CAMPAIGNS CARD GRID VIEW */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {campaigns.map((camp) => (
-              <div 
-                key={camp.id} 
+              <div
+                key={camp.id}
                 className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl p-5 flex flex-col justify-between shadow-md hover:scale-[1.01] transition-transform cursor-pointer"
                 onClick={() => setSelectedCampaignId(camp.id)}
               >
@@ -786,7 +898,7 @@ export default function CampaignsPage() {
                     {camp.description && (
                       <p className="text-[11px] text-slate-400 mt-1.5 line-clamp-2">{camp.description}</p>
                     )}
-                    
+
                     <div className="mt-3 space-y-1.5">
                       <p className="text-[10px] text-slate-400 flex items-center gap-1.5 font-medium">
                         <Users className="w-3.5 h-3.5 text-slate-500" />
@@ -800,7 +912,7 @@ export default function CampaignsPage() {
                   </div>
                 </div>
 
-                <div 
+                <div
                   className="mt-6 pt-4 border-t border-slate-800/60 flex items-center justify-between"
                   onClick={(e) => e.stopPropagation()} // Prevent card viewDetails navigation
                 >
@@ -872,8 +984,8 @@ export default function CampaignsPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-800/40 text-slate-300">
                   {campaigns.map((camp) => (
-                    <tr 
-                      key={camp.id} 
+                    <tr
+                      key={camp.id}
                       className="hover:bg-slate-850/30 transition-colors text-xs cursor-pointer"
                       onClick={() => setSelectedCampaignId(camp.id)}
                     >
@@ -918,7 +1030,7 @@ export default function CampaignsPage() {
                           >
                             View
                           </button>
-                          
+
                           <button
                             onClick={() => handleEditCampaignClick(camp)}
                             className="text-blue-400 hover:text-blue-300 px-2 py-1 rounded text-[10px] font-bold border border-slate-800 hover:border-blue-950/50 bg-blue-950/5 transition-colors cursor-pointer"
@@ -954,36 +1066,93 @@ export default function CampaignsPage() {
         /* TEMPLATES LIST */
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {templates.map((tpl) => (
-            <div key={tpl.id} className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md flex flex-col justify-between">
+            <div key={tpl.id} className="bg-slate-900 border border-slate-800 hover:border-slate-750 rounded-xl p-6 shadow-md flex flex-col justify-between transition-all">
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-bold text-white">{tpl.name}</h3>
-                  <span className="text-[10px] font-bold text-slate-400 bg-slate-950 px-2 py-0.5 rounded-full border border-slate-850">
+                  <div className="flex items-center gap-2">
+                    {tpl.type === 'Email' ? (
+                      <Mail className="w-4 h-4 text-blue-400" />
+                    ) : (
+                      <MessageSquare className="w-4 h-4 text-emerald-400" />
+                    )}
+                    <h3 className="text-sm font-bold text-white">{tpl.name}</h3>
+                  </div>
+
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    tpl.type === 'Email'
+                      ? 'bg-blue-950/60 border-blue-800/60 text-blue-300'
+                      : 'bg-emerald-950/60 border-emerald-800/60 text-emerald-300'
+                  }`}>
                     {tpl.type}
                   </span>
                 </div>
 
                 {tpl.subject && (
                   <div className="text-[11px] font-bold text-slate-400 mb-2 truncate">
-                    Subject: <span className="text-slate-300 font-semibold">{tpl.subject}</span>
+                    Subject: <span className="text-slate-200 font-semibold">{tpl.subject}</span>
                   </div>
                 )}
 
-                <div className="bg-slate-950 p-4 rounded-lg border border-slate-850 text-xs text-slate-400 font-mono whitespace-pre-wrap line-clamp-4">
+                <div className="bg-slate-950 p-4 rounded-lg border border-slate-850 text-xs text-slate-300 font-mono whitespace-pre-wrap line-clamp-5 shadow-inner">
                   {tpl.body}
                 </div>
               </div>
 
-              <div className="mt-6 pt-4 border-t border-slate-800/60 flex items-center gap-1.5 text-[9px] text-slate-500 font-semibold">
-                <Variable className="w-3.5 h-3.5 text-blue-500" />
-                <span>Supports dynamic user and company placeholders.</span>
+              <div className="mt-6 pt-4 border-t border-slate-800/60 flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-semibold">
+                  <Variable className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Supports dynamic placeholders</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleCopyTemplateBody(tpl.id, tpl.body)}
+                    className="p-1.5 text-slate-400 hover:text-white bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-md transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-semibold"
+                    title="Copy template content"
+                  >
+                    {copiedTemplateId === tpl.id ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-400" />
+                        <span className="text-emerald-400">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" />
+                        <span>Copy</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => handleDeleteTemplateClick(tpl.id)}
+                    className="p-1.5 text-red-400 hover:text-red-300 bg-red-950/20 border border-red-900/40 hover:border-red-800/60 rounded-md transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-semibold"
+                    title="Delete template"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Delete</span>
+                  </button>
+                </div>
               </div>
             </div>
           ))}
 
           {templates.length === 0 && (
-            <div className="md:col-span-2 border border-dashed border-slate-800 rounded-xl p-12 text-center text-slate-500 font-semibold">
-              No message templates designed yet. Create one to support campaigns.
+            <div className="md:col-span-2 border border-dashed border-slate-800 rounded-2xl p-12 text-center text-slate-500 font-semibold flex flex-col items-center justify-center gap-3">
+              <div className="p-3 bg-slate-900 rounded-full border border-slate-800 text-slate-400">
+                <Sparkles className="w-6 h-6 text-indigo-400" />
+              </div>
+              <p className="text-xs text-slate-400">No message templates designed yet. Generate one with AI or create manually!</p>
+              <button
+                onClick={() => {
+                  setShowAiModal(true);
+                  setAiOptions([]);
+                  setAiPrompt('');
+                }}
+                className="mt-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-2"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Generate Template with AI</span>
+              </button>
             </div>
           )}
         </div>
@@ -994,7 +1163,7 @@ export default function CampaignsPage() {
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 text-slate-100 max-h-[90vh] overflow-y-auto">
             <h3 className="text-base font-bold text-white mb-4">Create Message Template</h3>
-            
+
             <form onSubmit={handleTemplateSubmit} className="space-y-4">
               <div className="grid grid-cols-3 gap-4">
                 <div className="col-span-2">
@@ -1049,7 +1218,7 @@ export default function CampaignsPage() {
                   <label htmlFor="tpl_body" className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                     Template Body <span className="text-red-500">*</span>
                   </label>
-                  
+
                   {/* Dynamic placeholders helper info */}
                   <div className="flex gap-1.5 text-[8px] font-bold text-blue-400">
                     <span>&#123;&#123;first_name&#125;&#125;</span>
@@ -1092,7 +1261,7 @@ export default function CampaignsPage() {
       {showCampaignModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 text-slate-100 relative max-h-[90vh] overflow-y-auto">
-            
+
             {showInlineTemplateForm ? (
               /* Inline Template Creator inside Campaign Modal */
               <div>
@@ -1101,7 +1270,7 @@ export default function CampaignsPage() {
                     <Sparkles className="w-4 h-4 text-emerald-400" />
                     <span>Create Instant Template</span>
                   </h3>
-                  <button 
+                  <button
                     onClick={() => setShowInlineTemplateForm(false)}
                     className="text-xs text-slate-400 hover:text-white font-medium cursor-pointer"
                   >
@@ -1198,9 +1367,9 @@ export default function CampaignsPage() {
                 <h3 className="text-base font-bold text-white mb-4">
                   {editingCampaignId ? 'Edit Outreach Campaign' : 'Create Outreach Campaign'}
                 </h3>
-                
+
                 <form onSubmit={handleCampaignSubmit} className="space-y-4">
-                  
+
                   {/* Campaign Title */}
                   <div>
                     <label htmlFor="camp_name" className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
@@ -1278,7 +1447,7 @@ export default function CampaignsPage() {
                           <option key={t.id} value={t.id}>{t.name} ({t.type})</option>
                         ))}
                       </select>
-                      
+
                       <button
                         type="button"
                         onClick={() => setShowInlineTemplateForm(true)}
@@ -1389,11 +1558,349 @@ export default function CampaignsPage() {
                 </form>
               </div>
             )}
+          </div>
+        </div>
+      )}
 
+      {/* POPUP MODAL: AI Template Generator */}
+      {showAiModal && (
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="w-full max-w-3xl bg-slate-900 border border-slate-800/80 rounded-2xl shadow-2xl text-slate-100 max-h-[92vh] overflow-y-auto flex flex-col">
+
+            {/* Modal Header */}
+            <div className="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between bg-slate-950/50 sticky top-0 z-10 backdrop-blur-sm">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-gradient-to-tr from-purple-600 to-indigo-500 rounded-xl text-white shadow-md shadow-purple-950/50">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    AI Message Template Generator
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-950 border border-indigo-700 text-indigo-300">
+                      Multi-Model AI
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Generate multi-option Email & WhatsApp templates powered by OpenAI ChatGPT or Google Gemini.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowAiModal(false)}
+                className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6 flex-1 overflow-y-auto">
+              {/* Step 1: Configuration Form */}
+              <form onSubmit={handleGenerateAIOptions} className="space-y-5">
+
+                {/* 1. Provider & Channel Selector */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                  {/* Provider Choice: OpenAI vs Gemini */}
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                      Select AI Provider Engine <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAiProvider('openai')}
+                        className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
+                          aiProvider === 'openai'
+                            ? 'bg-purple-950/40 border-purple-500/80 text-white shadow-md shadow-purple-950/30'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className={`p-1.5 rounded-lg ${aiProvider === 'openai' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                          <Bot className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold">OpenAI ChatGPT</div>
+                          <div className="text-[10px] text-slate-500">GPT-4o Mini</div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setAiProvider('gemini')}
+                        className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
+                          aiProvider === 'gemini'
+                            ? 'bg-emerald-950/40 border-emerald-500/80 text-white shadow-md shadow-emerald-950/30'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className={`p-1.5 rounded-lg ${aiProvider === 'gemini' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                          <Cpu className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold">Google Gemini</div>
+                          <div className="text-[10px] text-slate-500">Gemini 2.5 / Flash</div>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Channel Choice: Email vs WhatsApp */}
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                      Target Channel <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAiChannel('Email')}
+                        className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
+                          aiChannel === 'Email'
+                            ? 'bg-blue-950/40 border-blue-500/80 text-white shadow-md shadow-blue-950/30'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className={`p-1.5 rounded-lg ${aiChannel === 'Email' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                          <Mail className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold">Email</div>
+                          <div className="text-[10px] text-slate-500">Subject + Body</div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setAiChannel('WhatsApp')}
+                        className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
+                          aiChannel === 'WhatsApp'
+                            ? 'bg-emerald-950/40 border-emerald-500/80 text-white shadow-md shadow-emerald-950/30'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className={`p-1.5 rounded-lg ${aiChannel === 'WhatsApp' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                          <MessageSquare className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold">WhatsApp</div>
+                          <div className="text-[10px] text-slate-500">Short & Direct</div>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tone Selector */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    Copy Tone & Brand Style
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {['Professional', 'Friendly', 'Persuasive', 'Urgent', 'Casual'].map((tone) => (
+                      <button
+                        key={tone}
+                        type="button"
+                        onClick={() => setAiTone(tone)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                          aiTone === tone
+                            ? 'bg-indigo-600 border-indigo-500 text-white shadow-md'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {tone}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Prompt Instruction Area */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label htmlFor="ai_prompt" className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      AI Generation Instruction / Goal <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-slate-500">Be descriptive for best output</span>
+                  </div>
+
+                  <textarea
+                    id="ai_prompt"
+                    rows={3}
+                    required
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 px-3.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-medium resize-none shadow-inner"
+                    placeholder="e.g. Write a compelling follow-up message to prospective leads who downloaded our SaaS free trial 3 days ago offering a 15-minute onboarding call..."
+                  />
+
+                  {/* Starter Prompt Chips */}
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                    <span className="text-[10px] text-slate-500 font-semibold mr-1">Try prompt:</span>
+                    {[
+                      "Product demo follow-up call",
+                      "Black Friday 20% discount offer",
+                      "Welcome new registered lead",
+                      "Re-engage cold subscribers"
+                    ].map((starter) => (
+                      <button
+                        key={starter}
+                        type="button"
+                        onClick={() => setAiPrompt(starter)}
+                        className="text-[10px] bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-slate-200 px-2.5 py-1 rounded-full border border-slate-800 transition-colors cursor-pointer"
+                      >
+                        + {starter}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Submit AI Button */}
+                <button
+                  type="submit"
+                  disabled={isGeneratingAi || !aiPrompt.trim()}
+                  className="w-full bg-gradient-to-r from-indigo-600 via-purple-600 to-emerald-600 hover:from-indigo-500 hover:to-emerald-500 disabled:opacity-50 text-white py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-purple-950/40 cursor-pointer transition-all hover:scale-[1.005]"
+                >
+                  {isGeneratingAi ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
+                      <span>Synthesizing Options with {aiProvider === 'openai' ? 'OpenAI ChatGPT' : 'Google Gemini'}...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="w-4 h-4 text-amber-300" />
+                      <span>Generate 3 Message Template Options</span>
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Step 2: Generated Options Preview & Customization */}
+              {aiOptions.length > 0 && (
+                <div className="pt-6 border-t border-slate-800 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Select & Customize AI Option ({aiOptions.length} Variations Generated)</span>
+                    </h4>
+                    <span className="text-[10px] text-slate-500">Click an option tab to preview & edit</span>
+                  </div>
+
+                  {/* Option Tabs */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {aiOptions.map((opt, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleSelectAiOption(idx)}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                          selectedAiIndex === idx
+                            ? 'bg-indigo-950/60 border-indigo-500 text-white shadow-md shadow-indigo-950/40'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-bold uppercase text-indigo-400">Option {idx + 1}</span>
+                          {selectedAiIndex === idx && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                        </div>
+                        <div className="text-xs font-semibold truncate text-slate-200">{opt.name || `Variation ${idx + 1}`}</div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Selected Option Editor Form */}
+                  <div className="bg-slate-950 p-4 sm:p-5 rounded-2xl border border-slate-800 space-y-4 shadow-inner">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                          Template Name
+                        </label>
+                        <input
+                          type="text"
+                          value={editingTName}
+                          onChange={(e) => setEditingTName(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-indigo-500 font-semibold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                          Channel
+                        </label>
+                        <input
+                          type="text"
+                          disabled
+                          value={aiChannel}
+                          className="w-full bg-slate-900/60 border border-slate-800 rounded-lg py-2 px-3 text-xs text-slate-400 font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    {aiChannel === 'Email' && (
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                          Email Subject Line
+                        </label>
+                        <input
+                          type="text"
+                          value={editingTSubject}
+                          onChange={(e) => setEditingTSubject(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-indigo-500 font-medium"
+                          placeholder="Email subject line with {{first_name}}..."
+                        />
+                      </div>
+                    )}
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          Template Body Content
+                        </label>
+
+                        {/* Insert Placeholders Chips */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-slate-500">Insert:</span>
+                          {['first_name', 'company_name', 'phone', 'email'].map((v) => (
+                            <button
+                              key={v}
+                              type="button"
+                              onClick={() => insertVariableTag(v)}
+                              className="text-[9px] bg-slate-900 hover:bg-slate-800 border border-slate-800 text-indigo-300 px-1.5 py-0.5 rounded cursor-pointer transition-colors"
+                            >
+                              + &#123;&#123;{v}&#125;&#125;
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <textarea
+                        rows={5}
+                        value={editingTBody}
+                        onChange={(e) => setEditingTBody(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2.5 px-3 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500 resize-none shadow-inner"
+                      />
+                    </div>
+
+                    <div className="pt-2 flex items-center justify-between">
+                      <span className="text-[10px] text-slate-500 font-medium">
+                        Length: {editingTBody.length} chars
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={handleSaveAiTemplate}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-2"
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>Save as Active Template</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
     </div>
   );
-}
+};

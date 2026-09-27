@@ -158,6 +158,8 @@ interface AppState {
   scrapeLeads: (query: string, collectionId: number) => Promise<void>;
   fetchTemplates: () => Promise<void>;
   createTemplate: (templateData: any) => Promise<void>;
+  generateAITemplates: (params: { prompt: string; type: 'Email' | 'WhatsApp'; provider: 'openai' | 'gemini'; tone?: string }) => Promise<any>;
+  deleteTemplate: (id: number) => Promise<void>;
   fetchCampaigns: () => Promise<void>;
   createCampaign: (campaignData: any) => Promise<void>;
   updateCampaign: (campaignId: number, campaignData: any) => Promise<void>;
@@ -168,6 +170,10 @@ interface AppState {
   fetchMetrics: () => Promise<void>;
   fetchIntegrations: () => Promise<void>;
   connectWhatsApp: (phone: string, credentials?: any, status?: string) => Promise<void>;
+  generateWhatsAppQR: (phoneNumber?: string) => Promise<any>;
+  checkWhatsAppStatus: () => Promise<any>;
+  disconnectWhatsApp: () => Promise<void>;
+  confirmWhatsAppQR: (params?: { session_id?: string; phone_number?: string; device_name?: string; push_name?: string }) => Promise<any>;
   connectGmail: (email: string, credentials?: any, status?: string) => Promise<void>;
   disconnectIntegration: (id: number) => Promise<void>;
   fetchMetaConfig: () => Promise<{ meta_app_id: string; meta_redirect_uri: string; meta_config_id?: string; is_mock_mode: boolean }>;
@@ -479,6 +485,36 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
+  generateAITemplates: async (params) => {
+    const active = get().activeBusiness;
+    if (!active) throw new Error("No active business selected");
+    try {
+      return await apiFetch('/api/templates/generate_ai/', {
+        method: 'POST',
+        body: JSON.stringify(params),
+        businessId: active.id,
+      });
+    } catch (err: any) {
+      set({ error: err.message });
+      throw err;
+    }
+  },
+
+  deleteTemplate: async (id) => {
+    const active = get().activeBusiness;
+    if (!active) return;
+    try {
+      await apiFetch(`/api/templates/${id}/`, {
+        method: 'DELETE',
+        businessId: active.id,
+      });
+      get().fetchTemplates();
+    } catch (err: any) {
+      set({ error: err.message });
+      throw err;
+    }
+  },
+
   fetchCampaigns: async () => {
     const active = get().activeBusiness;
     if (!active) return;
@@ -660,6 +696,65 @@ export const useStore = create<AppState>((set, get) => ({
         businessId: active.id,
       });
       get().fetchIntegrations();
+    } catch (err: any) {
+      set({ error: err.message });
+      throw err;
+    }
+  },
+
+  generateWhatsAppQR: async (phoneNumber = '') => {
+    const active = get().activeBusiness;
+    if (!active) throw new Error("No active business selected");
+    return apiFetch('/api/integrations/generate_whatsapp_qr/', {
+      method: 'POST',
+      body: JSON.stringify({ phone_number: phoneNumber }),
+      businessId: active.id,
+    });
+  },
+
+  checkWhatsAppStatus: async () => {
+    const active = get().activeBusiness;
+    if (!active) return { connected: false, status: 'no_business' };
+    try {
+      const res = await apiFetch('/api/integrations/check_whatsapp_status/', {
+        method: 'GET',
+        businessId: active.id,
+      });
+      if (res.connected) {
+        get().fetchIntegrations();
+      }
+      return res;
+    } catch (err: any) {
+      return { connected: false, status: 'error', error: err.message };
+    }
+  },
+
+  disconnectWhatsApp: async () => {
+    const active = get().activeBusiness;
+    if (!active) return;
+    try {
+      await apiFetch('/api/integrations/disconnect_whatsapp/', {
+        method: 'POST',
+        businessId: active.id,
+      });
+      get().fetchIntegrations();
+    } catch (err: any) {
+      set({ error: err.message });
+      throw err;
+    }
+  },
+
+  confirmWhatsAppQR: async (params = {}) => {
+    const active = get().activeBusiness;
+    if (!active) throw new Error("No active business selected");
+    try {
+      const res = await apiFetch('/api/integrations/confirm_whatsapp_qr/', {
+        method: 'POST',
+        body: JSON.stringify(params),
+        businessId: active.id,
+      });
+      get().fetchIntegrations();
+      return res;
     } catch (err: any) {
       set({ error: err.message });
       throw err;
