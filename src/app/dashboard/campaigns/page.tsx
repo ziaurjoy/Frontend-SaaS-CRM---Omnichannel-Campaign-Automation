@@ -53,6 +53,8 @@ export default function CampaignsPage() {
     deleteCampaign,
     triggerCampaign,
     fetchCampaignMessages,
+    resetRecipient,
+    deleteRecipient,
     activeBusiness,
     loading
   } = useStore();
@@ -169,6 +171,9 @@ export default function CampaignsPage() {
   const [cSchedule, setCSchedule] = useState('Immediate');
   const [cScheduledTime, setCScheduledTime] = useState('');
   const [cStatus, setCStatus] = useState('Draft');
+  const [cMinInterval, setCMinInterval] = useState(0);
+  const [cMaxInterval, setCMaxInterval] = useState(0);
+  const [intervalError, setIntervalError] = useState('');
 
   // Inline Template Creation Form State inside Campaign Modal
   const [showInlineTemplateForm, setShowInlineTemplateForm] = useState(false);
@@ -183,6 +188,7 @@ export default function CampaignsPage() {
   const [campaignMessages, setCampaignMessages] = useState<any[]>([]);
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [recipientActionLoading, setRecipientActionLoading] = useState<Record<number, string>>({});
 
   // Table states
   const [searchQuery, setSearchQuery] = useState('');
@@ -268,6 +274,13 @@ export default function CampaignsPage() {
     e.preventDefault();
     if (!cName) return;
 
+    // Client-side interval validation
+    if (cMinInterval > cMaxInterval) {
+      setIntervalError('Maximum interval must be ≥ minimum interval.');
+      return;
+    }
+    setIntervalError('');
+
     const payload = {
       name: cName,
       description: cDescription || null,
@@ -278,6 +291,8 @@ export default function CampaignsPage() {
       status: cStatus,
       schedule_type: cSchedule,
       scheduled_time: cSchedule === 'Scheduled' && cScheduledTime ? new Date(cScheduledTime).toISOString() : null,
+      min_interval: cMinInterval,
+      max_interval: cMaxInterval,
     };
 
     try {
@@ -297,6 +312,9 @@ export default function CampaignsPage() {
       setCSchedule('Immediate');
       setCScheduledTime('');
       setCStatus('Draft');
+      setCMinInterval(0);
+      setCMaxInterval(0);
+      setIntervalError('');
     } catch (err) {}
   };
 
@@ -311,6 +329,9 @@ export default function CampaignsPage() {
     setCSchedule(camp.schedule_type);
     setCScheduledTime(camp.scheduled_time ? new Date(camp.scheduled_time).toISOString().substring(0, 16) : '');
     setCStatus(camp.status);
+    setCMinInterval(camp.min_interval ?? 0);
+    setCMaxInterval(camp.max_interval ?? 0);
+    setIntervalError('');
     setShowCampaignModal(true);
   };
 
@@ -368,10 +389,42 @@ export default function CampaignsPage() {
   const handleTriggerCampaignFromDetails = async (id: number) => {
     try {
       await triggerCampaign(id);
+      // Refresh after a short delay to pick up new status from backend
       setTimeout(() => {
         setRefreshTrigger(prev => prev + 1);
-      }, 1000);
+      }, 800);
     } catch (err) {}
+  };
+
+  const handleResetRecipient = async (msg: any) => {
+    if (!selectedCampaignId) return;
+    setRecipientActionLoading(prev => ({ ...prev, [msg.id]: 'reset' }));
+    try {
+      await resetRecipient(selectedCampaignId, msg.id);
+      // Immediately update local state to show Pending while re-fetch is in flight
+      setCampaignMessages(prev =>
+        prev.map(m => m.id === msg.id ? { ...m, status: 'Pending', sent_at: null, failed_reason: null } : m)
+      );
+      setTimeout(() => setRefreshTrigger(prev => prev + 1), 1200);
+    } catch (err: any) {
+      alert(`Reset failed: ${err.message}`);
+    } finally {
+      setRecipientActionLoading(prev => { const n = { ...prev }; delete n[msg.id]; return n; });
+    }
+  };
+
+  const handleDeleteRecipient = async (msg: any) => {
+    if (!selectedCampaignId) return;
+    if (!window.confirm(`Remove ${msg.lead_name || msg.recipient} from this campaign? This cannot be undone.`)) return;
+    setRecipientActionLoading(prev => ({ ...prev, [msg.id]: 'delete' }));
+    try {
+      await deleteRecipient(selectedCampaignId, msg.id);
+      setCampaignMessages(prev => prev.filter(m => m.id !== msg.id));
+    } catch (err: any) {
+      alert(`Delete failed: ${err.message}`);
+    } finally {
+      setRecipientActionLoading(prev => { const n = { ...prev }; delete n[msg.id]; return n; });
+    }
   };
 
   // Metrics calculation
@@ -526,12 +579,21 @@ export default function CampaignsPage() {
               <button
                 onClick={() => handleTriggerCampaignFromDetails(selectedCampaign.id)}
                 disabled={loading.trigger || isMessagesLoading}
-                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+                className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50 ${
+                  selectedCampaign.status === 'Active'
+                    ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                    : 'bg-blue-600 hover:bg-blue-500 text-white'
+                }`}
               >
                 {loading.trigger ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Running...</span>
+                    <span>{selectedCampaign.status === 'Active' ? 'Pausing...' : 'Starting...'}</span>
+                  </>
+                ) : selectedCampaign.status === 'Active' ? (
+                  <>
+                    <span>⏸</span>
+                    <span>Pause Campaign</span>
                   </>
                 ) : (
                   <>
@@ -675,6 +737,7 @@ export default function CampaignsPage() {
                   <th className="py-4 px-6 text-center">Delivery Status</th>
                   <th className="py-4 px-6 text-center">Response Status</th>
                   <th className="py-4 px-6">Campaign</th>
+                  <th className="py-4 px-6 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/50">
@@ -691,6 +754,8 @@ export default function CampaignsPage() {
                           ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
                           : msg.status === 'Sent'
                           ? 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                          : msg.status === 'Processing'
+                          ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'
                           : msg.status === 'Failed'
                           ? 'bg-red-500/10 border-red-500/20 text-red-400'
                           : 'bg-slate-800 border-slate-700 text-slate-400'
@@ -708,12 +773,40 @@ export default function CampaignsPage() {
                       </span>
                     </td>
                     <td className="py-3.5 px-6 text-slate-400 font-medium">{selectedCampaign.name}</td>
+                    <td className="py-3.5 px-6">
+                      <div className="flex items-center justify-center gap-1.5">
+                        {/* Reset button */}
+                        <button
+                          onClick={() => handleResetRecipient(msg)}
+                          disabled={msg.status === 'Processing' || recipientActionLoading[msg.id] === 'reset'}
+                          title={msg.status === 'Processing' ? 'Currently sending — wait for completion' : 'Reset and resend this recipient'}
+                          className="px-2 py-1 rounded text-[9px] font-bold border border-amber-900/50 bg-amber-950/20 text-amber-400 hover:bg-amber-900/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center gap-0.5"
+                        >
+                          {recipientActionLoading[msg.id] === 'reset'
+                            ? <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                            : <RefreshCw className="w-2.5 h-2.5" />}
+                          <span>Reset</span>
+                        </button>
+                        {/* Delete button */}
+                        <button
+                          onClick={() => handleDeleteRecipient(msg)}
+                          disabled={msg.status === 'Processing' || recipientActionLoading[msg.id] === 'delete'}
+                          title={msg.status === 'Processing' ? 'Cannot delete while sending' : 'Remove this recipient'}
+                          className="px-2 py-1 rounded text-[9px] font-bold border border-red-900/50 bg-red-950/10 text-red-400 hover:bg-red-900/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center gap-0.5"
+                        >
+                          {recipientActionLoading[msg.id] === 'delete'
+                            ? <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                            : <Trash2 className="w-2.5 h-2.5" />}
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
 
                 {filteredMessages.length === 0 && !isMessagesLoading && (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-500 font-semibold">
+                    <td colSpan={7} className="py-12 text-center text-slate-500 font-semibold">
                       No campaign lead records found matching these criteria.
                     </td>
                   </tr>
@@ -721,7 +814,7 @@ export default function CampaignsPage() {
 
                 {isMessagesLoading && (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-500">
+                    <td colSpan={7} className="py-12 text-center text-slate-500">
                       <div className="flex items-center justify-center gap-2">
                         <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
                         <span className="font-semibold">Loading campaign leads...</span>
@@ -841,6 +934,9 @@ export default function CampaignsPage() {
                 setCSchedule('Immediate');
                 setCScheduledTime('');
                 setCStatus('Draft');
+                setCMinInterval(0);
+                setCMaxInterval(0);
+                setIntervalError('');
                 setShowCampaignModal(true);
               }}
               className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 cursor-pointer transition-colors"
@@ -1538,6 +1634,51 @@ export default function CampaignsPage() {
                         className="w-full bg-slate-950 disabled:bg-slate-950/40 disabled:text-slate-600 disabled:border-slate-800/40 border border-slate-800 rounded-lg py-2 px-3 text-xs text-white focus:outline-none cursor-pointer disabled:cursor-not-allowed"
                       />
                     </div>
+                  </div>
+
+                  {/* Random Send Interval */}
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                      Random Send Interval <span className="normal-case font-normal text-slate-500">(seconds between messages, 0 = no delay)</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="camp_min_interval" className="block text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                          Minimum (seconds)
+                        </label>
+                        <input
+                          id="camp_min_interval"
+                          type="number"
+                          min={0}
+                          value={cMinInterval}
+                          onChange={(e) => { setCMinInterval(parseInt(e.target.value) || 0); setIntervalError(''); }}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-xs text-white focus:outline-none"
+                          placeholder="e.g. 60"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="camp_max_interval" className="block text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                          Maximum (seconds)
+                        </label>
+                        <input
+                          id="camp_max_interval"
+                          type="number"
+                          min={0}
+                          value={cMaxInterval}
+                          onChange={(e) => { setCMaxInterval(parseInt(e.target.value) || 0); setIntervalError(''); }}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-xs text-white focus:outline-none"
+                          placeholder="e.g. 180"
+                        />
+                      </div>
+                    </div>
+                    {intervalError && (
+                      <p className="mt-1 text-[10px] font-semibold text-red-400">{intervalError}</p>
+                    )}
+                    {!intervalError && cMaxInterval > 0 && (
+                      <p className="mt-1 text-[10px] text-slate-500">
+                        Delay per message: {cMinInterval}–{cMaxInterval}s &nbsp;≈&nbsp; {(cMinInterval/60).toFixed(1)}–{(cMaxInterval/60).toFixed(1)} min
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex gap-3 mt-6">

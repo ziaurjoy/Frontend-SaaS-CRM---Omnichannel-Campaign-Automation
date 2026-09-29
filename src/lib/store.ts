@@ -68,6 +68,8 @@ interface Campaign {
   status: string;
   schedule_type: string;
   scheduled_time?: string;
+  min_interval: number;
+  max_interval: number;
   created_at: string;
 }
 
@@ -166,6 +168,8 @@ interface AppState {
   deleteCampaign: (campaignId: number) => Promise<void>;
   triggerCampaign: (campaignId: number) => Promise<void>;
   fetchCampaignMessages: (campaignId: number) => Promise<any[]>;
+  resetRecipient: (campaignId: number, messageId: number) => Promise<void>;
+  deleteRecipient: (campaignId: number, messageId: number) => Promise<void>;
   fetchMessages: () => Promise<void>;
   fetchMetrics: () => Promise<void>;
   fetchIntegrations: () => Promise<void>;
@@ -597,6 +601,26 @@ export const useStore = create<AppState>((set, get) => ({
     } finally {
       set({ loading: { ...get().loading, trigger: false } });
     }
+  },
+
+  resetRecipient: async (campaignId, messageId) => {
+    const active = get().activeBusiness;
+    if (!active) return;
+    await apiFetch(`/api/campaigns/${campaignId}/reset_recipient/`, {
+      method: 'POST',
+      body: JSON.stringify({ message_id: messageId }),
+      businessId: active.id,
+    });
+  },
+
+  deleteRecipient: async (campaignId, messageId) => {
+    const active = get().activeBusiness;
+    if (!active) return;
+    await apiFetch(`/api/campaigns/${campaignId}/delete_recipient/`, {
+      method: 'DELETE',
+      body: JSON.stringify({ message_id: messageId }),
+      businessId: active.id,
+    });
   },
 
   fetchCampaignMessages: async (campaignId) => {
